@@ -138,6 +138,9 @@ textarea::placeholder { color: var(--text-muted); }
 .status-item { display: flex; align-items: center; gap: 5px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; }
 
+.footerbar { background: var(--surface); border-top: 1px solid var(--border); padding: 3px 20px; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.footerbar a { color: inherit; text-decoration: underline; }
+
 .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--surface); color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 10px 20px; border-radius: 8px; border: 1px solid var(--green); opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -233,6 +236,8 @@ SomeNewDrug 100mg [30 เม็ด] - รับประทาน 1 เม็ด
     Waiting for input
   </div>
 </div>
+
+<div class="footerbar">© 2026 directed by <a href="mailto:uradev222@gmail.com">Uradev</a></div>
 
 <div class="toast" id="toast"></div>
 
