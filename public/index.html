@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedOrder Converter — AI + Offline Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #21262d; --surface3: #30363d;
+  --border: #30363d; --text: #e6edf3; --text-secondary: #8b949e; --text-muted: #484f58;
+  --accent: #58a6ff; --green: #3fb950; --green-bg: #1a3a20;
+  --orange: #d29922; --orange-bg: #2e2006;
+  --red: #f85149; --red-bg: #3b1219;
+  --purple: #bc8cff; --purple-bg: #2d1f5e;
+  --yellow: #e3b341; --yellow-bg: #2d2000;
+  --mono: 'IBM Plex Mono', monospace; --sans: 'Sarabun', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; line-height: 1.6; }
+
+/* Header */
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.logo { display: flex; align-items: center; gap: 12px; }
+.logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #3fb950, #58a6ff, #bc8cff); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.logo-text { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+.logo-sub { font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.badge { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+.badge-hybrid { background: var(--purple-bg); color: var(--purple); border: 1px solid #6e40c9; }
+
+/* API key bar */
+.apibar {
+  background: var(--surface2); border-bottom: 1px solid var(--border);
+  padding: 8px 28px; display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px;
+}
+.apibar-label { color: var(--text-muted); white-space: nowrap; }
+.apibar input {
+  flex: 1; max-width: 380px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 10px; font-family: var(--mono); font-size: 11px; outline: none;
+}
+.apibar input:focus { border-color: var(--accent); }
+.apibar-hint { color: var(--text-muted); font-size: 10px; }
+.apibar-status { margin-left: auto; font-size: 10px; color: var(--text-muted); }
+
+/* Layout */
+.app { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 105px); }
+.pane { display: flex; flex-direction: column; border-right: 1px solid var(--border); overflow: hidden; }
+.pane:last-child { border-right: none; }
+.pane-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+.pane-title { font-family: var(--mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot-blue { background: var(--accent); } .dot-green { background: var(--green); }
+.pane-actions { display: flex; gap: 6px; }
+
+.btn { font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
+.btn-primary { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+.btn-primary:hover { background: #79bbff; }
+.btn-primary:disabled { background: var(--surface3); color: var(--text-muted); border-color: var(--border); cursor: not-allowed; }
+.btn-ghost { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+.btn-ghost:hover { background: var(--surface2); color: var(--text); }
+.btn-red { background: transparent; color: var(--red); border-color: var(--red-bg); }
+.btn-red:hover { background: var(--red-bg); }
+
+.textarea-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+textarea { flex: 1; background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 12px; line-height: 1.9; border: none; outline: none; resize: none; padding: 18px 20px; width: 100%; height: 100%; }
+textarea::placeholder { color: var(--text-muted); }
+.char-count { position: absolute; bottom: 8px; right: 12px; font-family: var(--mono); font-size: 10px; color: var(--text-muted); pointer-events: none; }
+
+.output-wrap { flex: 1; overflow-y: auto; padding: 18px 20px; font-family: var(--mono); font-size: 12.5px; line-height: 1.9; }
+.output-wrap::-webkit-scrollbar { width: 4px; }
+.output-wrap::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 4px; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; gap: 12px; padding: 40px; }
+.empty-icon { font-size: 40px; opacity: 0.3; }
+.empty-title { font-family: var(--mono); font-size: 13px; color: var(--text-muted); }
+.empty-sub { font-size: 12px; color: var(--text-muted); opacity: 0.7; max-width: 300px; line-height: 1.7; }
+
+/* Order lines */
+.section-header { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); padding: 4px 0 6px; margin-top: 16px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.section-header:first-child { margin-top: 0; }
+.order-line { display: flex; align-items: baseline; padding: 5px 8px; border-radius: 4px; margin-bottom: 3px; border: 1px solid transparent; transition: background 0.1s; }
+.order-line:hover { background: var(--surface2); border-color: var(--border); }
+.order-line.ai-resolved { border-left: 2px solid var(--purple); }
+.drug-name { font-weight: 600; color: var(--text); min-width: 200px; flex-shrink: 0; }
+.drug-sig { color: var(--text-secondary); flex: 1; }
+.drug-time { font-size: 10px; font-weight: 600; letter-spacing: 0.05em; margin-left: 12px; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; }
+.t-morning { background: #1a3047; color: #79c0ff; }
+.t-hs      { background: var(--purple-bg); color: var(--purple); }
+.t-tid     { background: #1a2e1a; color: #56d364; }
+.t-inject  { background: var(--red-bg); color: #ff7b72; }
+.t-noon    { background: var(--orange-bg); color: var(--orange); }
+.t-supply  { background: var(--surface2); color: var(--text-muted); }
+.t-ai      { background: #2d1f5e; color: #bc8cff; }
+
+/* AI resolve indicator */
+.ai-badge { font-size: 9px; background: var(--purple-bg); color: var(--purple); padding: 1px 5px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+.learned-badge { font-size: 9px; background: var(--yellow-bg); color: var(--yellow); padding: 1px 5px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+.order-line.learned-line { border-left: 2px solid var(--yellow) !important; }
+
+/* Unknown pill — shown while waiting for AI */
+.unknown-line { border-left: 2px solid var(--yellow) !important; opacity: 0.7; }
+.resolving-badge { font-size: 9px; background: var(--yellow-bg); color: var(--yellow); padding: 1px 5px; border-radius: 3px; margin-left: 6px; animation: blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* Schedule */
+.schedule-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+.sched-col { background: var(--surface2); border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+.sched-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 10px; text-align: center; }
+.sched-head.morning { background: #1f3551; color: #79c0ff; }
+.sched-head.noon    { background: #2e2006; color: #d29922; }
+.sched-head.evening { background: #2d1f5e; color: #bc8cff; }
+.sched-head.night   { background: #1a1a2e; color: #8b949e; }
+.sched-body { padding: 6px 8px; }
+.sched-item { font-size: 10px; color: var(--text-secondary); padding: 2px 4px 2px 6px; margin-bottom: 2px; border-left: 2px solid var(--surface3); }
+
+/* Raw box */
+.raw-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-top: 16px; overflow: hidden; }
+.raw-box-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 7px 12px; display: flex; align-items: center; justify-content: space-between; }
+.raw-box-label { font-size: 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+.raw-text { padding: 12px 14px; font-size: 11.5px; line-height: 2; color: #79c0ff; white-space: pre; overflow-x: auto; }
+
+/* Summary bar */
+.summary-bar { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; margin-bottom: 12px; display: flex; gap: 16px; font-size: 11px; font-family: var(--mono); }
+.sum-item { display: flex; align-items: center; gap: 5px; color: var(--text-muted); }
+.sum-val { font-weight: 700; }
+.sum-val.green { color: var(--green); }
+.sum-val.purple { color: var(--purple); }
+.sum-val.yellow { color: var(--yellow); }
+
+.order-block { animation: fadeUp 0.3s ease both; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* Status bar */
+.statusbar { background: var(--surface); border-top: 1px solid var(--border); padding: 5px 20px; display: flex; align-items: center; gap: 16px; font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
+.status-item { display: flex; align-items: center; gap: 5px; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+.toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(10px); background: var(--surface); color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 10px 20px; border-radius: 8px; border: 1px solid var(--green); opacity: 0; transition: all 0.2s; pointer-events: none; z-index: 999; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 768px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  .pane { height: 50vh; }
+  .schedule-grid { grid-template-columns: repeat(2,1fr); }
+  .apibar { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">⚕</div>
+    <div>
+      <div class="logo-text">MedOrder Hybrid</div>
+      <div class="logo-sub">Offline + Learn · D1 Cloud · AI fallback</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div style="display:flex;background:var(--surface2);border-radius:8px;padding:2px;border:1px solid var(--border)">
+      <button class="mode-btn active" id="modeOff" onclick="setMode('offline')" style="font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;background:var(--green-bg);color:var(--green);border:none">⚙ Offline</button>
+      <button class="mode-btn" id="modeAI" onclick="setMode('ai')" style="font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;cursor:pointer;background:transparent;color:var(--text-muted);border:none">🤖 AI</button>
+    </div>
+    <span class="badge badge-hybrid" onclick="openLearnedPanel()" style="cursor:pointer">📚 Learned: <span id="learnCount">0</span></span>
+  </div>
+</div>
+
+<!-- API Key bar -->
+<div class="apibar">
+  <span class="apibar-label">🔑 API Key (optional):</span>
+  <input type="password" id="apiKeyInput" placeholder="sk-ant-... (ใส่เฉพาะถ้ามียาไม่รู้จัก)">
+  <span class="apibar-hint">ถ้าไม่ใส่ — ยาที่ไม่รู้จักจะถูก parse แบบ best-effort แทน</span>
+  <span class="apibar-status" id="apiStatus">⚙ Offline ready</span>
+</div>
+
+<div class="app">
+  <!-- INPUT -->
+  <div class="pane">
+    <div class="pane-header">
+      <div class="pane-title"><span class="dot dot-blue"></span>Medication Reconcile Input</div>
+      <div class="pane-actions">
+        <button class="btn btn-red" onclick="clearAll()">✕ Clear</button>
+        <button class="btn btn-primary" id="convertBtn" onclick="convert()">⚡ Convert</button>
+      </div>
+    </div>
+    <div class="textarea-wrap">
+      <textarea id="inputText" placeholder="วาง Medication Reconcile text ที่นี่...
+
+รองรับทุก format เช่น:
+Metformin tablet 500mg [160 เม็ด] - ฉันครั้งละ 2 เม็ด หลังอาหาร เช้า
+Insulin-NPH 3 ml [3 cartridge] - ฉีดเข้าใต้ผิวหนัง 8 ยูนิต เวลา 20.00 น
+SomeNewDrug 100mg [30 เม็ด] - รับประทาน 1 เม็ด ก่อนนอน
+
+→ ยาที่รู้จัก: แปลงทันที (offline)
+→ ยาไม่รู้จัก: ส่ง AI ช่วย (ถ้ามี API key)" oninput="updateCount()"></textarea>
+      <div class="char-count" id="charCount">0 chars</div>
+    </div>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="pane">
+    <div class="pane-header">
+      <div class="pane-title"><span class="dot dot-green"></span>Doctor Order</div>
+      <div class="pane-actions">
+        <button class="btn btn-ghost" id="copyBtn" onclick="copyRaw()" style="display:none">📋 Copy</button>
+        <button class="btn btn-ghost" id="printBtn" onclick="window.print()" style="display:none">🖨 Print</button>
+      </div>
+    </div>
+    <div class="output-wrap" id="outputArea">
+      <div class="empty-state">
+        <div class="empty-icon">⚕</div>
+        <div class="empty-title">Hybrid Mode Ready</div>
+        <div class="empty-sub">
+          ยาที่อยู่ใน database → แปลงเลย <span style="color:var(--green)">●</span><br>
+          ยาไม่รู้จัก → ส่ง AI ช่วย <span style="color:var(--purple)">●</span><br>
+          ไม่มี API key → best-effort parse <span style="color:var(--yellow)">●</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="statusbar">
+  <div class="status-item">
+    <div class="status-dot" style="background:var(--green)"></div>
+    Hybrid · Offline + AI fallback
+  </div>
+  <div class="status-item" id="statusMsg">
+    <div class="status-dot" style="background:var(--text-muted)"></div>
+    Waiting for input
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  DRUG DATABASE (offline rules)
+// ═══════════════════════════════════════════════
+const DRUG_RULES = [
+  // Antidiabetic
+  { match: /metformin/i,       name: 'Metformin',       doseRe: /(\d+)\s*mg/i, category: 'antidiabetic', special: 'metformin' },
+  { match: /pioglitazone/i,    name: 'Pioglitazone',    doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /teneligliptin/i,   name: 'Teneligliptin',   doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /glipizide/i,       name: 'Glipizide',       doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /glibenclamide/i,   name: 'Glibenclamide',   doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'antidiabetic' },
+  { match: /gliclazide/i,      name: 'Gliclazide',      doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /glimepiride/i,     name: 'Glimepiride',     doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'antidiabetic' },
+  { match: /sitagliptin/i,     name: 'Sitagliptin',     doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /vildagliptin/i,    name: 'Vildagliptin',    doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /saxagliptin/i,     name: 'Saxagliptin',     doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /dapagliflozin/i,   name: 'Dapagliflozin',   doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /empagliflozin/i,   name: 'Empagliflozin',   doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /canagliflozin/i,   name: 'Canagliflozin',   doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  { match: /acarbose/i,        name: 'Acarbose',        doseRe: /(\d+)\s*mg/i, category: 'antidiabetic' },
+  // Insulin
+  { match: /insulin[\s\-]*nph|winsulin[\s\-]*n|nph\b/i, name: 'NPH Insulin', doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin' },
+  { match: /insulin[\s\-]*regular|actrapid|humulin[\s\-]*r/i, name: 'Regular Insulin', doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin' },
+  { match: /glargine|lantus|toujeo/i, name: 'Insulin Glargine', doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin' },
+  { match: /detemir|levemir/i,        name: 'Insulin Detemir',  doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin' },
+  { match: /degludec|tresiba/i,       name: 'Insulin Degludec', doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin' },
+  { match: /ryzodeg|degludec.*aspart|aspart.*degludec/i, name: 'Ryzodeg (Degludec+Aspart)', doseRe: /(\d+)\s*(units?|ยูนิต)/i, category: 'insulin', special: 'insulin_bid' },
+  // Lipid
+  { match: /simvastatin/i,     name: 'Simvastatin',     doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /atorvastatin/i,    name: 'Atorvastatin',    doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /rosuvastatin/i,    name: 'Rosuvastatin',    doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /pravastatin/i,     name: 'Pravastatin',     doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /lovastatin/i,      name: 'Lovastatin',      doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /fenofibrate/i,     name: 'Fenofibrate',     doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /gemfibrozil/i,     name: 'Gemfibrozil',     doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  { match: /ezetimibe/i,       name: 'Ezetimibe',       doseRe: /(\d+)\s*mg/i, category: 'lipid' },
+  // Cardiac / BP
+  { match: /hydralazine/i,     name: 'Hydralazine',     doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /amlodipine/i,      name: 'Amlodipine',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /nifedipine/i,      name: 'Nifedipine',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /felodipine/i,      name: 'Felodipine',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /enalapril/i,       name: 'Enalapril',       doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /lisinopril/i,      name: 'Lisinopril',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /ramipril/i,        name: 'Ramipril',        doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /perindopril/i,     name: 'Perindopril',     doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /losartan/i,        name: 'Losartan',        doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /valsartan/i,       name: 'Valsartan',       doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /irbesartan/i,      name: 'Irbesartan',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /telmisartan/i,     name: 'Telmisartan',     doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /metoprolol/i,      name: 'Metoprolol',      doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /bisoprolol/i,      name: 'Bisoprolol',      doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /atenolol/i,        name: 'Atenolol',        doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /carvedilol/i,      name: 'Carvedilol',      doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /propranolol/i,     name: 'Propranolol',     doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /furosemide|furetic/i, name: 'Furosemide',   doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /hydrochlorothiazide|hctz/i, name: 'HCTZ',  doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /spironolactone/i,  name: 'Spironolactone',  doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /digoxin/i,         name: 'Digoxin',         doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /aspirin/i,         name: 'Aspirin',         doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /clopidogrel/i,     name: 'Clopidogrel',     doseRe: /(\d+)\s*mg/i, category: 'cardiac' },
+  { match: /warfarin/i,        name: 'Warfarin',        doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'cardiac' },
+  { match: /manidipine|cardiplot/i, name: 'Manidipine',  doseRe: /(\d+)\s*mg/i,            category: 'cardiac' },
+  // Gout / Uric acid
+  { match: /colchicine/i,      name: 'Colchicine',      doseRe: /(\d+(?:\.\d+)?)\s*mg/i, category: 'gout' },
+  { match: /allopurinol/i,     name: 'Allopurinol',     doseRe: /(\d+)\s*mg/i,            category: 'gout' },
+  { match: /febuxostat/i,      name: 'Febuxostat',      doseRe: /(\d+)\s*mg/i,            category: 'gout' },
+  { match: /benzbromarone/i,   name: 'Benzbromarone',   doseRe: /(\d+)\s*mg/i,            category: 'gout' },
+  // Thyroid
+  { match: /levothyroxine|thyroxine|thyrosit|eltroxin/i, name: 'Levothyroxine', doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'thyroid' },
+  { match: /methimazole|neomercazole/i, name: 'Methimazole', doseRe: /(\d+)\s*mg/i, category: 'thyroid' },
+  { match: /propylthiouracil|ptu\b/i,  name: 'PTU',          doseRe: /(\d+)\s*mg/i, category: 'thyroid' },
+  // Neurology / Pain
+  { match: /gabapentin/i,      name: 'Gabapentin',      doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /pregabalin/i,      name: 'Pregabalin',      doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /amitriptyline/i,   name: 'Amitriptyline',   doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /duloxetine/i,      name: 'Duloxetine',      doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /carbamazepine/i,   name: 'Carbamazepine',   doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /phenytoin/i,       name: 'Phenytoin',       doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /levetiracetam/i,   name: 'Levetiracetam',   doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /tramadol/i,        name: 'Tramadol',        doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /paracetamol|acetaminophen/i, name: 'Paracetamol', doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /ibuprofen/i,       name: 'Ibuprofen',       doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /diclofenac/i,      name: 'Diclofenac',      doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  { match: /celecoxib/i,       name: 'Celecoxib',       doseRe: /(\d+)\s*mg/i, category: 'neuro' },
+  // Respiratory
+  { match: /bromhexine/i,       name: 'Bromhexine',       doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /doxofylline/i,      name: 'Doxofylline',      doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /acetylcysteine|flemex|nac\b/i, name: 'Acetylcysteine', doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /ambroxol/i,        name: 'Ambroxol',        doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /salbutamol/i,      name: 'Salbutamol',      doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'respiratory' },
+  { match: /theophylline/i,    name: 'Theophylline',    doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /montelukast/i,     name: 'Montelukast',     doseRe: /(\d+)\s*mg/i, category: 'respiratory' },
+  { match: /prednisolone/i,    name: 'Prednisolone',    doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'respiratory' },
+  // Allergy / Antihistamine
+  { match: /cetirizine/i,      name: 'Cetirizine',      doseRe: /(\d+)\s*mg/i, category: 'allergy' },
+  { match: /loratadine/i,      name: 'Loratadine',      doseRe: /(\d+)\s*mg/i, category: 'allergy' },
+  { match: /chlorpheniramine|cpm\b/i, name: 'Chlorpheniramine', doseRe: /(\d+)\s*mg/i, category: 'allergy' },
+  { match: /fexofenadine/i,    name: 'Fexofenadine',    doseRe: /(\d+)\s*mg/i, category: 'allergy' },
+  { match: /desloratadine/i,   name: 'Desloratadine',   doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'allergy' },
+  { match: /hydroxyzine/i,     name: 'Hydroxyzine',     doseRe: /(\d+)\s*mg/i, category: 'allergy' },
+  // GI / PPI
+  { match: /omeprazole/i,      name: 'Omeprazole',      doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /esomeprazole/i,    name: 'Esomeprazole',    doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /pantoprazole/i,    name: 'Pantoprazole',    doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /lansoprazole/i,    name: 'Lansoprazole',    doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /rabeprazole/i,     name: 'Rabeprazole',     doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /ranitidine/i,      name: 'Ranitidine',      doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /famotidine/i,      name: 'Famotidine',      doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /metoclopramide/i,  name: 'Metoclopramide',  doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /domperidone/i,     name: 'Domperidone',     doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  { match: /sucralfate/i,      name: 'Sucralfate',      doseRe: /(\d+)\s*(mg|g)/i, category: 'gi' },
+  { match: /lactulose/i,       name: 'Lactulose',       doseRe: /(\d+)\s*ml/i, category: 'gi' },
+  { match: /bisacodyl/i,       name: 'Bisacodyl',       doseRe: /(\d+)\s*mg/i, category: 'gi' },
+  // Vitamins / Supplements
+  { match: /vit[\s\.\-]*b[\s\.\-]*(1[-\/]?6[-\/]?12|complex)/i, name: 'Vit B1-B6-B12', doseRe: null, category: 'vitamin', special: 'vitB' },
+  { match: /methylcobal|mecze|methylcobalamin/i, name: 'Methylcobalamin', doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'vitamin', special: 'notCovered' },
+  { match: /thiamine|vit[\s\.]*b1\b/i, name: 'Vit B1 (Thiamine)', doseRe: /(\d+)\s*mg/i, category: 'vitamin' },
+  { match: /vit[\s\.]*c|ascorbic/i,    name: 'Vit C',   doseRe: /(\d+)\s*mg/i, category: 'vitamin' },
+  { match: /vit[\s\.]*d|calcitriol|cholecalciferol/i, name: 'Vit D', doseRe: /(\d+)\s*(mg|iu|IU)/i, category: 'vitamin' },
+  { match: /calcium carb|calci/i, name: 'Calcium Carbonate', doseRe: /(\d+)\s*mg/i, category: 'vitamin' },
+  { match: /ferrous|iron\s*tab/i, name: 'Ferrous Sulfate', doseRe: /(\d+)\s*mg/i, category: 'vitamin' },
+  { match: /folic\s*acid/i,    name: 'Folic Acid',      doseRe: /(\d+(\.\d+)?)\s*mg/i, category: 'vitamin' },
+  // Inhalers / Nebulizers
+  { match: /inhalex|ipratropium.*fenoterol|fenoterol.*ipratropium/i, name: 'Inhalex Forte (Ipratropium+Fenoterol)', doseRe: null, category: 'inhaler', special: 'neb' },
+  { match: /tiotropium|spiriva|handihaler/i,  name: 'Tiotropium (Spiriva)',    doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /seretide|fluticasone.*salmeterol|salmeterol.*fluticasone/i, name: 'Seretide Accuhaler (Fluticasone/Salmeterol)', doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /berodual/i,                       name: 'Berodual Inhaler',        doseRe: null,                      category: 'inhaler', special: 'inhale' },
+  { match: /salbutamol.*inhaler|ventolin/i,   name: 'Salbutamol Inhaler',      doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /budesonide.*formoterol|symbicort/i, name: 'Symbicort',             doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /fluticasone.*furoate|relvar|incruse/i, name: 'Fluticasone Furoate', doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /formoterol|foradil/i,             name: 'Formoterol',              doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /ipratropium\s*bromide|atrovent/i, name: 'Ipratropium (Atrovent)',  doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /budesonide\s*(?!.*formoterol)|pulmicort/i, name: 'Budesonide',     doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  { match: /fluticasone\s*(?!.*salmeterol|.*furoate)|flixotide/i, name: 'Fluticasone', doseRe: /(\d+(?:\.\d+)?)\s*mcg/i, category: 'inhaler', special: 'inhale' },
+  // Hematology / Oncology
+  { match: /hydroxyurea|hydroxycarbamide|hydrea/i, name: 'Hydroxyurea', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /imatinib|gleevec|glivec/i, name: 'Imatinib', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /nilotinib|tasigna/i, name: 'Nilotinib', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /dasatinib|sprycel/i, name: 'Dasatinib', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /ponatinib|iclusig/i, name: 'Ponatinib', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /ruxolitinib|jakavi/i, name: 'Ruxolitinib', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /lenalidomide|revlimid/i, name: 'Lenalidomide', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /thalidomide/i, name: 'Thalidomide', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /dexamethasone|dexa/i, name: 'Dexamethasone', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  { match: /azacitidine|vidaza/i, name: 'Azacitidine', doseRe: /(\d+)\s*mg/i, category: 'hematology' },
+  // Topical / Spray / External
+  { match: /biofresh|mouth\s*spray/i,     name: 'Biofresh Mouth Spray', doseRe: null, category: 'topical', special: 'spray' },
+  { match: /chlorhexidine.*spray|mouth.*spray/i, name: 'Mouth Spray',    doseRe: null, category: 'topical', special: 'spray' },
+  { match: /triamcinolone.*oral\s*paste|kenalog/i, name: 'Triamcinolone Oral Paste', doseRe: null, category: 'topical' },
+  { match: /nystatin.*oral|oral.*nystatin/i, name: 'Nystatin Oral Susp', doseRe: /(\d+,?\d*)\s*(units?|IU)/i, category: 'topical' },
+  // Supplies
+  { match: /sterile cotton|สำลี/i,          name: 'Sterile Cotton Balls', doseRe: null, category: 'supply' },
+  { match: /needle penfill|เข็ม.*penfill/i, name: 'Needle Penfill 6mm',  doseRe: null, category: 'supply' },
+  { match: /alcohol.*sol|70%.*alcohol/i,     name: '70% Alcohol Solution', doseRe: null, category: 'supply' },
+  { match: /lancet/i,                        name: 'Lancet',               doseRe: null, category: 'supply' },
+  { match: /test strip|glucose strip/i,      name: 'Glucose Test Strip',   doseRe: null, category: 'supply' },
+  { match: /syringe|syringes/i,              name: 'Syringe',              doseRe: null, category: 'supply' },
+];
+
+const CATEGORY_LABELS = {
+  antidiabetic: '💊 Antidiabetic Agents', insulin: '💉 Insulin',
+  lipid: '🩸 Lipid-lowering', neuro: '🧠 Neurology / Pain',
+  cardiac: '❤️ Cardiac / Antihypertensive', respiratory: '🫁 Respiratory',
+  allergy: '🌿 Antihistamine / Allergy', gi: '🫄 GI / PPI',
+  vitamin: '🅱 Supplements', supply: '🩹 Supplies',
+  gout: '🦴 Gout / Uric Acid', thyroid: '🦋 Thyroid', inhaler: '🫁 Inhaler / Nebulizer', topical: '💨 Topical / Spray / External',
+  hematology: '🔬 Hematology / Oncology',
+  unknown: '📦 Other Medications',
+};
+const CAT_ORDER = ['antidiabetic','insulin','lipid','neuro','cardiac','hematology','respiratory','inhaler','allergy','gi','gout','thyroid','vitamin','topical','supply','unknown'];
+
+// ═══════════════════════════════════════════════
+//  TIMING PARSER
+// ═══════════════════════════════════════════════
+function parseTiming(t) {
+  // Strip คำแนะนำ/สรรพคุณ tail to prevent false route/timing detection
+  t = t.replace(/\s*คำแนะนำ\s*:.*$/i, '').replace(/\s*สรรพคุณ\s*:.*$/i, '');
+  const r = { qty:1, freq:1, route:'oral', timing:[], timeNote:'', timeType:'morning', conditional:null };
+  // Oral keyword locks route — prevents สรรพคุณ text bleeding into route detection
+  const isOralKw = /ฉัน|รับประทาน|กิน|กลืน/i.test(t);
+  if (isOralKw) r.route = 'oral';
+  // Explicit non-oral overrides
+  if (/ฉีด|inject|sc\b|subcutan/i.test(t)) r.route = 'SC';
+  if (/iv\b|intravenous/i.test(t)) r.route = 'IV';
+  if (/สูด|inhale|accuhaler|handihaler|turbuhaler|rotahaler/i.test(t)) r.route = 'inhale';
+  if (/พ่น.*เครื่อง|nebuliz|neb\b|unit\s*dose/i.test(t)) r.route = 'neb';
+  else if (!isOralKw && /พ่นยา|mouth\s*spray/i.test(t)) r.route = 'spray';
+  if (/หยอด.*ตา|eye\s*drop/i.test(t)) r.route = 'eye drop';
+  if (/หยอด.*หู|ear\s*drop/i.test(t)) r.route = 'ear drop';
+  // Topical only on explicit external instruction words — not from สรรพคุณ field
+  if (!isOralKw && /ทาบริเวณ|ทาผิวหนัง|ใช้ภายนอก/i.test(t)) r.route = 'topical';
+
+  // Strip dispensed qty from brackets before parsing
+  const tClean = t.replace(/\[\d+\s*(?:เม็ด|แคปซูล|tablet|cap|เม็ดฟู่|pack|ชิ้น|cartridge|bottle|unit\s*dose|inhalation|inhaler|box|ml)[^\]]*\]/gi, '');
+
+  // ── Frequency (วันละ N ครั้ง) — parse FIRST before qty ──
+  if (/วันละ\s*4|4\s*ครั้ง|qid\b/i.test(tClean)) r.freq = 4;
+  else if (/วันละ\s*3|3\s*ครั้ง|tid\b/i.test(tClean)) r.freq = 3;
+  else if (/วันละ\s*2|2\s*ครั้ง|bid\b/i.test(tClean)) r.freq = 2;
+  else r.freq = 1;
+
+  // ── Quantity per dose (ครั้งละ N) — explicit patterns only ──
+  // Must NOT accidentally capture "วันละ N" numbers
+  const qtyPatterns = [
+    /ครั้งละ\s*(\d+)/i,                          // ครั้งละ 3
+    /(\d+)\s*เม็ด\s*(?:ต่อครั้ง|ครั้งละ)/i,    // 3 เม็ด ต่อครั้ง
+    /(\d+)\s*(?:แคปซูล|เม็ดฟู่)\s*(?:ต่อครั้ง|ครั้งละ)/i,
+  ];
+  for (const pat of qtyPatterns) {
+    const m = tClean.match(pat);
+    if (m) { r.qty = parseInt(m[1]); break; }
+  }
+  // Insulin / injection units override qty
+  const um = tClean.match(/(\d+)\s*(?:units?|ยูนิต)/i);
+  if (um) r.qty = parseInt(um[1]);
+  // Inhaler puffs / vials
+  const puffMatch = tClean.match(/(\d+)\s*(?:จังหวะ|puff|หลอด)/i);
+  if (puffMatch) r.qty = parseInt(puffMatch[1]);
+
+  // PRN / as needed
+  const isPRN = /เวลามีอาการ|เมื่อมีอาการ|เมื่อจำเป็น|prn\b|as\s*needed|when\s*needed/i.test(t);
+
+  // วันเว้นวัน / alternate day
+  const isQOD = /วันเว้นวัน|alternate\s*day|every\s*other\s*day|qod\b/i.test(t);
+
+  const isPC = /หลังอาหาร|after\s*meal|pc\b/i.test(t);
+  const isAC = /ก่อนอาหาร|before\s*meal|ac\b/i.test(t);
+  const isHS = /ก่อนนอน|bedtime|hs\b/i.test(t);
+  const hasMorn = /เช้า|morning/i.test(t);
+  const hasNoon = /กลางวัน|เที่ยง|เพล|noon/i.test(t);
+  const hasEve  = /เย็น|evening/i.test(t);
+
+  if (/ถ้ามี.*เพล|ถ้ารับประทาน.*เพล|เพล.*ถ้า/i.test(t)) r.conditional = 'เพล';
+
+  const clock = t.match(/(\d{1,2})[.:]\d{2}\s*น\.?/);
+  if (clock) r.timeNote = clock[0];
+
+  if (isHS)   { r.timing.push('hs'); r.timeType = 'hs'; }
+  if (hasMorn) r.timing.push('morning');
+  if (hasNoon || r.conditional) r.timing.push('noon');
+  if (hasEve)  r.timing.push('evening');
+  if (r.route === 'SC') r.timeType = 'inject';
+  if (r.timing.length === 0) {
+    if (r.freq === 3) r.timing = ['morning','noon','evening'];
+    else if (r.freq === 2) r.timing = ['morning','evening'];
+    else r.timing = ['morning'];
+  }
+  if (r.timing.length === 1 && r.timeType !== 'inject') {
+    r.timeType = r.timing[0] === 'hs' ? 'hs' : r.timing[0] === 'noon' ? 'noon' : 'morning';
+  }
+  if (r.freq === 3) r.timeType = 'tid';
+
+  const freqMap = {1:'OD',2:'BID',3:'TID',4:'QID'};
+  const mealStr = isPC ? 'PC' : isAC ? 'AC' : '';
+  const tod = [hasMorn&&'เช้า', hasNoon&&'กลางวัน', hasEve&&'เย็น', (isHS)&&'HS'].filter(Boolean).join('/');
+  const routeLabel = r.route === 'oral' ? 'oral' : r.route;
+  const unitLabel = (r.route === 'inhale') ? 'puff' : (r.route === 'neb') ? 'vial' : (r.route === 'spray') ? 'spray' : '';
+  const qtyLabel = unitLabel ? `${r.qty} ${unitLabel}` : `${r.qty}×`;
+  let sig = unitLabel ? `${qtyLabel} ${routeLabel}` : `${r.qty}×${freqMap[r.freq]||r.freq} ${routeLabel}`;
+  if (unitLabel && freqMap[r.freq]) sig += ` ${freqMap[r.freq]||''}`; 
+  if (mealStr) sig += ` ${mealStr}`;
+  if (tod) sig += ` ${tod}`;
+  if (r.conditional) sig += ` (ถ้ามีมื้อเพล)`;
+  if (r.timeNote) sig += ` @ ${r.timeNote}`;
+  if (isPRN) { sig = sig.replace(/\d×(OD|BID|TID)/, '1×PRN'); r.timeStr = 'PRN'; r.isPRN = true; }
+  if (isQOD) { sig += ' (วันเว้นวัน)'; r.timeStr += ' QOD'; r.isQOD = true; }
+  r.sig = sig.trim();
+  r.timeStr = [tod, r.timeNote].filter(Boolean).join(' ') || freqMap[r.freq] || 'OD';
+  return r;
+}
+
+// ═══════════════════════════════════════════════
+//  OFFLINE PARSE
+// ═══════════════════════════════════════════════
+function parseOffline(line) {
+  if (!line.trim() || /^[-–—\t]+$/.test(line.trim())) return null;
+  const instructionOnly = line
+    .replace(/\s*คำแนะนำ\s*:.*$/i, '')
+    .replace(/\s*สรรพคุณ\s*:.*$/i, '')
+    .replace(/\s*ข้อบ่งใช้\s*:.*$/i, '');
+  const lineN = instructionOnly.replace(/([A-Za-zก-ฮ])(\d)/g, '$1 $2');
+  // Check learned drugs first (localStorage)
+  const learned = typeof matchFromLearned === 'function' ? matchFromLearned(lineN) : null;
+  if (learned) { const t = parseTiming(lineN); return { ...learned, sig: t.sig, timeStr: t.timeStr, timeType: t.timeType, timing: t.timing }; }
+  for (const rule of DRUG_RULES) {
+    if (!rule.match.test(lineN)) continue;
+    let dose = '';
+    if (rule.doseRe) { const dm = lineN.match(rule.doseRe); if (dm) dose = dm[1]; }
+    const t = parseTiming(lineN);
+    if (rule.special === 'metformin' && t.conditional) {
+      t.sig = `${t.qty}×1 oral PC เช้า + 1×1 oral PC เพล (ถ้ามีมื้อเพล)`;
+      t.timeStr = 'OD/BID'; t.timeType = 'morning'; t.timing = ['morning','noon'];
+    }
+    if (rule.special === 'insulin_bid') {
+      t.timeType = 'inject'; t.route = 'SC';
+      const u = lineN.match(/(\d+)\s*(units?|ยูนิต)/i);
+      const units = u ? u[1] : t.qty;
+      const freqM = lineN.match(/วันละ\s*(\d+)/);
+      const freq = freqM ? parseInt(freqM[1]) : 1;
+      const freqLabel = {1:'OD',2:'BID',3:'TID'}[freq]||'OD';
+      const hasMorn = /เช้า/.test(lineN), hasNoon = /เพล|กลางวัน/.test(lineN), hasEve = /เย็น/.test(lineN);
+      const tod = [hasMorn&&'เช้า', hasNoon&&'เพล', hasEve&&'เย็น'].filter(Boolean).join('/');
+      t.sig = `${units} units SC ${freqLabel}${tod?' '+tod:''}`;
+      t.timeStr = tod || freqLabel; t.timing = [hasMorn?'morning':'hs', hasNoon?'noon':hasEve?'evening':'hs'];
+    }
+    if (rule.special === 'insulin') {
+      t.timeType = 'inject'; t.route = 'SC';
+      const u = line.match(/(\d+)\s*(units?|ยูนิต)/i);
+      const units = u ? u[1] : t.qty;
+      const clock = line.match(/(\d{1,2})[.:]\d{2}/);
+      t.sig = `${units} units SC`; t.timeStr = clock ? `${clock[0]} น.` : 'HS'; t.timing = ['hs'];
+    }
+    if (rule.special === 'vitB' && /เบิกไม่ได้/.test(line)) t.sig += ' (เบิกไม่ได้)';
+    if (rule.special === 'notCovered' && /เบิกไม่ได้/.test(line)) t.sig += ' (เบิกไม่ได้)';
+    if (rule.special === 'neb') {
+      const vialM = lineN.match(/(\d+[-–]?\d*)\s*(?:หลอด|vial|unit)/i);
+      const vials = vialM ? vialM[1] : '1';
+      const isPRN = /เวลามีอาการ|เมื่อมีอาการ|prn/i.test(lineN);
+      t.sig = `${vials} vial neb${isPRN ? ' PRN' : ' OD'}`;
+      t.timeStr = isPRN ? 'PRN' : 'OD'; t.timeType = 'inject'; t.timing = isPRN ? [] : ['morning'];
+    }
+    if (rule.special === 'inhale') {
+      const puffM = lineN.match(/(\d+)\s*(?:จังหวะ|puff|ครั้ง)/i);
+      const puffs = puffM ? puffM[1] : '1';
+      const isPRN = /เวลามีอาการ|เมื่อมีอาการ|prn/i.test(lineN);
+      const freqM = lineN.match(/วันละ\s*(\d+)/);
+      const freq = freqM ? parseInt(freqM[1]) : 1;
+      const freqLabel = {1:'OD',2:'BID',3:'TID',4:'QID'}[freq] || 'OD';
+      const hasMorn = /เช้า/.test(lineN), hasEve = /เย็น/.test(lineN);
+      const todLabel = [hasMorn&&'เช้า', hasEve&&'เย็น'].filter(Boolean).join('/');
+      t.sig = `${puffs} puff inhale ${freqLabel}${todLabel ? ' '+todLabel : ''}${isPRN ? ' PRN' : ''}`;
+      t.timeStr = isPRN ? 'PRN' : (todLabel || freqLabel);
+      t.timeType = isPRN ? 'supply' : (hasMorn ? 'morning' : 'hs');
+      t.timing = isPRN ? [] : (hasMorn && hasEve ? ['morning','evening'] : hasMorn ? ['morning'] : ['hs']);
+    }
+    if (rule.special === 'spray') {
+      // Parse spray dose e.g. "1-2 ครั้ง"
+      const sprayDose = lineN.match(/(\d+)[-–](\d+)\s*(?:ครั้ง|pump|puff|spray)/i);
+      const dose = sprayDose ? `${sprayDose[1]}-${sprayDose[2]} sprays` : '1-2 sprays';
+      const isPRN = /เวลามีอาการ|เมื่อมีอาการ|prn/i.test(lineN);
+      t.sig = `${dose} spray PRN`;
+      t.timeStr = 'PRN'; t.timeType = 'supply'; t.timing = [];
+    }
+    if (rule.category === 'supply') {
+      t.sig = 'ใช้ภายนอก / ตามแพทย์สั่ง'; t.timeStr = 'PRN'; t.timeType = 'supply'; t.timing = [];
+    }
+    return { drug: dose ? `${rule.name} (${dose})` : rule.name, sig: t.sig, timeStr: t.timeStr, timeType: t.timeType, timing: t.timing, category: rule.category, source: 'offline' };
+  }
+  // Fallback best-effort
+  // Handle names glued to dose e.g. "Fexofenadine180" → insert space before digit run
+  const lineNorm = line.replace(/([A-Za-zก-ฮ])(\d)/, '$1 $2');
+  const nm = lineNorm.match(/^([A-Za-z][A-Za-z\s\-]+?)\s+(?:tablet|cap|injection|\d+\s*(?:mg|mcg)|\[)/i);
+  const dm = lineNorm.match(/(\d+(?:\.\d+)?)\s*(mg|mcg)/i);
+  const rawName = nm ? nm[1].trim() : lineNorm.split(/[\[\-(]/)[0].trim().substring(0, 50);
+  // Remove brand names in parentheses e.g. "(FENAFEX)", "(PROCHIC)"
+  const name = rawName.replace(/\s*\([^)]+\)\s*/g, '').trim().substring(0, 40);
+  const dose = dm ? dm[1] : '';  // dm[1] = number only, dm[2] = unit (not shown)
+  const t = parseTiming(line);
+  return { drug: dose ? `${name} (${dose})` : name, sig: t.sig, timeStr: t.timeStr, timeType: t.timeType, timing: t.timing, category: 'unknown', source: 'offline-fallback', rawLine: line };
+}
+
+// ═══════════════════════════════════════════════
+//  AI FALLBACK for unknowns
+// ═══════════════════════════════════════════════
+const AI_SYSTEM = `You are a clinical pharmacist. Parse medication reconcile lines into doctor orders.
+Return ONLY a JSON array, no markdown, no extra text. Each item:
+{"drug":"DrugName (dose)","sig":"NxFreq route timing","timeStr":"timing label","timeType":"morning|noon|hs|tid|inject|supply","timing":["morning"],"category":"antidiabetic|insulin|lipid|neuro|cardiac|respiratory|allergy|gi|vitamin|supply|unknown"}
+Rules: strip dispensed qty from [brackets], use oral route unless injection specified, abbreviate: OD BID TID PC AC HS SC.`;
+
+async function resolveWithAI(unknownItems, apiKey) {
+  const lines = unknownItems.map((o,i) => `${i+1}. ${o.rawLine || o.drug}`).join('\n');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514', max_tokens: 1000,
+      system: AI_SYSTEM,
+      messages: [{ role: 'user', content: lines }]
+    })
+  });
+  if (!res.ok) throw new Error(`API ${res.status}`);
+  const data = await res.json();
+  const raw = data.content.map(c => c.text||'').join('').replace(/```json|```/g,'').trim();
+  return JSON.parse(raw);
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+const TC = { morning:'t-morning', noon:'t-noon', evening:'t-morning', hs:'t-hs', tid:'t-tid', inject:'t-inject', supply:'t-supply', ai:'t-ai' };
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderAll(orders) {
+  const groups = {};
+  CAT_ORDER.forEach(c => { groups[c] = []; });
+  orders.forEach(o => { (groups[o.category] = groups[o.category]||[]).push(o); });
+
+  const sched = { morning:[], noon:[], evening:[], hs:[] };
+  orders.filter(o => o.category !== 'supply').forEach(o => {
+    (o.timing||[]).forEach(t => { if (sched[t]) sched[t].push(o.drug.split(' (')[0]); });
+  });
+
+  // Counts
+  const offlineCount = orders.filter(o => o.source === 'offline').length;
+  const learnedCount = orders.filter(o => o.source === 'learned').length;
+  const d1Count      = orders.filter(o => o.source === 'd1-learned').length;
+  const aiCount      = orders.filter(o => o.source?.startsWith('ai')).length;
+  const fallbackCount = orders.filter(o => o.source === 'offline-fallback').length;
+
+  let html = `<div class="order-block">
+  <div class="summary-bar">
+    <div class="sum-item">Total <span class="sum-val">${orders.length}</span> items</div>
+    <div class="sum-item">● Offline <span class="sum-val green">${offlineCount}</span></div>
+    ${learnedCount ? `<div class="sum-item">📚 Local <span class="sum-val" style="color:var(--yellow)">${learnedCount}</span></div>` : ''}
+    ${d1Count ? `<div class="sum-item">☁ D1 <span class="sum-val" style="color:var(--accent)">${d1Count}</span></div>` : ''}
+    ${aiCount ? `<div class="sum-item">✦ AI <span class="sum-val purple">${aiCount}</span></div>` : ''}
+    ${fallbackCount ? `<div class="sum-item">~ Best-effort <span class="sum-val yellow">${fallbackCount}</span></div>` : ''}
+  </div>`;
+
+  CAT_ORDER.forEach(cat => {
+    if (!groups[cat] || groups[cat].length === 0) return;
+    html += `<div class="section-header">${CATEGORY_LABELS[cat]}</div>`;
+    groups[cat].forEach(o => {
+      const tc = TC[o.timeType] || 't-morning';
+      const isAI = o.source?.startsWith('ai');
+      const isD1 = o.source === 'd1-learned';
+      const isFallback = o.source === 'offline-fallback';
+      const isLearned = o.source === 'learned';
+      const extraClass = isAI ? ' ai-resolved' : (isD1 || isLearned) ? ' learned-line' : isFallback ? ' unknown-line' : '';
+      const badge = isAI ? '<span class="ai-badge">✦ AI</span>' : isD1 ? '<span class="learned-badge">☁</span>' : isLearned ? '<span class="learned-badge">📚</span>' : isFallback ? '<span class="resolving-badge">~</span>' : '';
+      html += `<div class="order-line${extraClass}">
+        <span class="drug-name">${esc(o.drug)}${badge}</span>
+        <span class="drug-sig">${esc(o.sig)}</span>
+        <span class="drug-time ${tc}">${esc(o.timeStr)}</span>
+      </div>`;
+    });
+  });
+
+  // Schedule
+  const schedEntries = [
+    { key:'morning', label:'🌅 เช้า', cls:'morning' },
+    { key:'noon',    label:'🌞 กลางวัน/เพล', cls:'noon' },
+    { key:'evening', label:'🌆 เย็น', cls:'evening' },
+    { key:'hs',      label:'🌙 ก่อนนอน/HS', cls:'night' },
+  ];
+  if (schedEntries.some(e => sched[e.key]?.length > 0)) {
+    html += `<div class="section-header" style="margin-top:20px">Daily Schedule</div><div class="schedule-grid">`;
+    schedEntries.forEach(({ key, label, cls }) => {
+      const items = sched[key] || [];
+      html += `<div class="sched-col"><div class="sched-head ${cls}">${label}</div><div class="sched-body">
+        ${items.length ? items.map(i => `<div class="sched-item">${esc(i)}</div>`).join('') : '<div class="sched-item" style="color:var(--text-muted)">—</div>'}
+      </div></div>`;
+    });
+    html += '</div>';
+  }
+
+  // Raw order text
+  const rawLines = [];
+  CAT_ORDER.forEach(cat => {
+    (groups[cat]||[]).forEach(o => {
+      rawLines.push(cat === 'supply' ? `${o.drug.padEnd(35)} [Supply]` : `${o.drug.padEnd(35)} ${o.sig}`);
+    });
+  });
+  const rawText = rawLines.join('\n');
+
+  html += `<div class="raw-box">
+    <div class="raw-box-header"><span class="raw-box-label">📄 Doctor Order Text</span>
+    <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="copyRaw()">Copy</button></div>
+    <div class="raw-text" id="rawOrderText">${esc(rawText)}</div>
+  </div></div>`;
+
+  document.getElementById('outputArea').innerHTML = html;
+  document.getElementById('copyBtn').style.display = 'flex';
+  document.getElementById('printBtn').style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════
+//  MAIN CONVERT
+// ═══════════════════════════════════════════════
+async function convert() {
+  const raw = document.getElementById('inputText').value.trim();
+  if (!raw) { showToast('⚠ กรุณาใส่ข้อมูลก่อน', '#d29922'); return; }
+
+  const btn = document.getElementById('convertBtn');
+  btn.disabled = true; btn.textContent = '⏳...';
+
+  const lines = raw.split(/\n/).map(l => l.trim()).filter(Boolean);
+  // Step 1: offline parse all lines
+  const orders = lines.map(parseOffline).filter(Boolean);
+
+  if (orders.length === 0) {
+    document.getElementById('outputArea').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-title" style="color:var(--red)">ไม่พบข้อมูลยา</div></div>`;
+    btn.disabled = false; btn.textContent = '⚡ Convert'; return;
+  }
+
+  // Render immediately with offline results
+  renderAll(orders);
+  const offlineCount = orders.filter(o => o.source === 'offline').length;
+  const unknowns = orders.filter(o => o.source === 'offline-fallback');
+  setStatus(`● Offline: ${offlineCount} รายการ${unknowns.length ? ` · ⚠ Unknown: ${unknowns.length}` : ''}`, 'var(--green)');
+
+  // Step 2: if unknowns exist, try AI (Workers AI or Anthropic API)
+  if (unknowns.length > 0) {
+    const apiKey = document.getElementById('apiKeyInput').value.trim();
+    const useWorkersAI = typeof currentMode !== 'undefined' && currentMode === 'ai' && !apiKey;
+    const useAnthropicAI = apiKey;
+
+    if (useAnthropicAI || useWorkersAI) {
+      setStatus(`✦ กำลังส่ง AI แก้ไข ${unknowns.length} รายการ...`, '#d29922');
+      document.getElementById('apiStatus').textContent = `⏳ AI resolving ${unknowns.length} items...`;
+      try {
+        let aiResults;
+        if (useAnthropicAI) {
+          aiResults = await resolveWithAI(unknowns, apiKey);
+        } else {
+          aiResults = await resolveWithWorkersAI(unknowns);
+        }
+        if (aiResults) {
+          (Array.isArray(aiResults) ? aiResults : []).forEach((aiItem, i) => {
+            if (!unknowns[i] || !aiItem) return;
+            const idx = orders.findIndex(o => o === unknowns[i]);
+            if (idx !== -1) {
+              const resolved = aiItem.generic_name
+                ? { drug: aiItem.dose ? `${aiItem.generic_name} (${String(aiItem.dose).replace(/\s*mg/,'')})` : aiItem.generic_name,
+                    sig: aiItem.sig || '', timeStr: (aiItem.timing||['morning']).join('/') || 'OD',
+                    timeType: (aiItem.timing||[]).includes('hs') ? 'hs' : 'morning',
+                    timing: aiItem.timing || ['morning'], category: aiItem.category || 'unknown', source: aiItem.source || 'ai' }
+                : { ...aiItem, source: aiItem.source || 'ai', timing: aiItem.timing || ['morning'] };
+              orders[idx] = resolved;
+              // Learn for future offline use (skip if already from D1)
+              if (typeof saveLearnedDrug === 'function' && !aiItem.source?.includes('d1')) {
+                const name = aiItem.generic_name || aiItem.drug;
+                if (name) saveLearnedDrug({
+                  name, pattern: name.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),
+                  category: aiItem.category || 'unknown', sig: resolved.sig,
+                  timeStr: resolved.timeStr, timeType: resolved.timeType, timing: resolved.timing
+                });
+              }
+            }
+          });
+        }
+        renderAll(orders);
+        const aiCount = orders.filter(o => o.source?.startsWith('ai')).length;
+        const d1Count = orders.filter(o => o.source === 'd1-learned').length;
+        const statusParts = [`Offline: ${offlineCount}`];
+        if (d1Count) statusParts.push(`D1: ${d1Count}`);
+        if (aiCount) statusParts.push(`AI: ${aiCount}`);
+        setStatus(`✓ เสร็จ · ${statusParts.join(' · ')} (learned!)`, 'var(--green)');
+        document.getElementById('apiStatus').textContent = `✓ ${d1Count ? 'D1:'+d1Count+' ' : ''}AI:${aiCount} + saved`;
+        showToast(`✦ แก้ไข ${aiCount + d1Count} รายการ + เรียนรู้แล้ว`, 'var(--purple)');
+      } catch(err) {
+        setStatus(`⚠ AI failed: ${err.message}`, '#d29922');
+        document.getElementById('apiStatus').textContent = `⚠ AI error`;
+        showToast('⚠ AI ไม่ได้ผล ใช้ offline แทน', '#d29922');
+      }
+    } else {
+      setStatus(`✓ Offline: ${offlineCount} · ~ Best-effort: ${unknowns.length} (เปิด AI mode หรือใส่ API key)`, '#d29922');
+      document.getElementById('apiStatus').textContent = `⚠ ${unknowns.length} unknowns — เปิด AI mode`;
+      showToast(`✓ แปลงสำเร็จ · ${unknowns.length} รายการใช้ best-effort`, '#d29922');
+    }
+  } else {
+    setStatus(`✓ Offline parse สำเร็จทั้งหมด · ${offlineCount} รายการ`, 'var(--green)');
+    showToast(`✓ แปลงสำเร็จ ${offlineCount} รายการ`);
+  }
+
+  btn.disabled = false; btn.textContent = '⚡ Convert';
+}
+
+function clearAll() {
+  document.getElementById('inputText').value = ''; updateCount();
+  document.getElementById('outputArea').innerHTML = `<div class="empty-state"><div class="empty-icon">⚕</div><div class="empty-title">Hybrid Mode Ready</div><div class="empty-sub">ยาที่อยู่ใน database → แปลงเลย <span style="color:var(--green)">●</span><br>ยาไม่รู้จัก → ส่ง AI ช่วย <span style="color:var(--purple)">●</span><br>ไม่มี API key → best-effort parse <span style="color:var(--yellow)">●</span></div></div>`;
+  document.getElementById('copyBtn').style.display = 'none';
+  document.getElementById('printBtn').style.display = 'none';
+  setStatus('Waiting for input', 'var(--text-muted)');
+}
+function updateCount() { document.getElementById('charCount').textContent = document.getElementById('inputText').value.length.toLocaleString() + ' chars'; }
+function setStatus(msg, color) { document.getElementById('statusMsg').innerHTML = `<div class="status-dot" style="background:${color}"></div>${msg}`; }
+function copyRaw() {
+  const el = document.getElementById('rawOrderText');
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => showToast('✓ Copied!'));
+}
+function showToast(msg, color='var(--green)') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.color = color; t.style.borderColor = color;
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2400);
+}
+document.getElementById('apiKeyInput').addEventListener('input', function() {
+  document.getElementById('apiStatus').textContent = this.value ? '🔑 API key set' : '⚙ Offline ready';
+});
+document.addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key==='Enter') convert(); });
+
+// ═══════════════════════════════════════════════
+//  LOCALSTORAGE LEARNING
+// ═══════════════════════════════════════════════
+const LS_KEY = 'medconv_learned_drugs';
+let currentMode = 'offline'; // 'offline' | 'ai'
+
+function getLearnedDrugs() { try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { return []; } }
+function saveLearnedDrug(item) {
+  const list = getLearnedDrugs();
+  if (list.find(d => d.name.toLowerCase() === item.name.toLowerCase())) return;
+  list.push({ ...item, learnedAt: new Date().toISOString() });
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  updateLearnBadge();
+}
+function updateLearnBadge() {
+  const el = document.getElementById('learnCount');
+  if (el) el.textContent = getLearnedDrugs().length;
+}
+function matchFromLearned(line) {
+  for (const d of getLearnedDrugs()) {
+    try {
+      if (new RegExp(d.pattern || d.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i').test(line)) {
+        const dm = line.match(/(\d+(?:\.\d+)?)\s*(mg|mcg)/i);
+        const dose = dm ? dm[1] : '';
+        return { drug: dose ? `${d.name} (${dose})` : d.name, sig: d.sig || '', timeStr: d.timeStr || 'OD',
+          timeType: d.timeType || 'morning', timing: d.timing || ['morning'], category: d.category || 'unknown', source: 'learned' };
+      }
+    } catch {}
+  }
+  return null;
+}
+function openLearnedPanel() {
+  const list = getLearnedDrugs();
+  const rows = list.length === 0 ? '<div style="color:var(--text-muted);padding:20px;text-align:center">ยังไม่มียาที่เรียนรู้ — เปิด AI mode แล้วแปลงยาใหม่</div>'
+    : '<table class="drug-table" style="margin-top:8px"><thead><tr><th>Drug</th><th>Category</th><th>Sig</th><th></th></tr></thead><tbody>'
+    + list.map((d,i) => `<tr><td style="font-weight:600;color:var(--text)">${esc(d.name)}</td><td>${esc(d.category||'')}</td><td style="color:var(--text-muted)">${esc(d.sig||'')}</td><td><button class="btn btn-ghost" style="font-size:9px;padding:2px 6px;color:var(--red)" onclick="removeLearned(${i})">✕</button></td></tr>`).join('')
+    + '</tbody></table>';
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)this.remove()" id="learnedModal">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:90vw;max-width:600px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-family:var(--mono);font-size:14px;font-weight:700">📚 Learned Drugs (${list.length})</span>
+        <div style="display:flex;gap:6px"><button class="btn btn-ghost" onclick="syncFromD1()" title="ดึงยาจาก D1 cloud">☁ Sync D1</button><button class="btn btn-ghost" onclick="exportLearned()">📤 Export</button><button class="btn btn-red" onclick="clearLearned()">🗑 Clear</button><button class="btn btn-ghost" onclick="document.getElementById('learnedModal').remove()">✕</button></div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:12px 20px">${rows}</div>
+    </div></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function removeLearned(idx) {
+  const list = getLearnedDrugs(); list.splice(idx, 1);
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+  updateLearnBadge();
+  const m = document.getElementById('learnedModal'); if (m) { m.remove(); openLearnedPanel(); }
+}
+function clearLearned() {
+  if (!confirm('ลบยาที่เรียนรู้ทั้งหมด?')) return;
+  localStorage.removeItem(LS_KEY); updateLearnBadge();
+  const m = document.getElementById('learnedModal'); if (m) { m.remove(); openLearnedPanel(); }
+  showToast('✓ ล้างแล้ว');
+}
+function exportLearned() {
+  const blob = new Blob([JSON.stringify(getLearnedDrugs(), null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `learned_drugs_${new Date().toISOString().slice(0,10)}.json`; a.click();
+  showToast('✓ Export สำเร็จ');
+}
+
+// Sync learned drugs FROM D1 → localStorage
+async function syncFromD1() {
+  try {
+    const res = await fetch('/api/parse');
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    if (!data.drugs?.length) { showToast('☁ D1 ว่าง — ยังไม่มียาที่เรียนรู้', '#d29922'); return; }
+    let added = 0;
+    for (const d of data.drugs) {
+      const list = getLearnedDrugs();
+      if (!list.find(x => x.name.toLowerCase() === d.generic_name.toLowerCase())) {
+        list.push({
+          name: d.generic_name, pattern: d.match_pattern,
+          category: d.category, sig: d.sig_template || '',
+          timing: JSON.parse(d.timing || '["morning"]'),
+          timeStr: 'OD', timeType: 'morning',
+          learnedAt: d.created_at, source: 'd1'
+        });
+        localStorage.setItem(LS_KEY, JSON.stringify(list));
+        added++;
+      }
+    }
+    updateLearnBadge();
+    showToast(`☁ Sync สำเร็จ — เพิ่ม ${added} ยาจาก D1 (ทั้งหมด ${data.drugs.length} ใน cloud)`);
+    const m = document.getElementById('learnedModal'); if (m) { m.remove(); openLearnedPanel(); }
+  } catch(e) {
+    showToast('⚠ Sync ไม่ได้ — deploy Cloudflare ก่อนหรือเช็ค D1 binding', '#d29922');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  AI FALLBACK (Workers AI → Gemini → Groq)
+// ═══════════════════════════════════════════════
+async function resolveWithWorkersAI(unknownItems) {
+  try {
+    const res = await fetch('/api/parse', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines: unknownItems.map(u => u.rawLine || u.drug) }),
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    return data.results || null;
+  } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════
+//  MODE TOGGLE
+// ═══════════════════════════════════════════════
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(mode === 'ai' ? 'modeAI' : 'modeOff').classList.add('active');
+  const s = document.getElementById('apiStatus');
+  if (mode === 'ai') { s.textContent = '🤖 AI Assist (Workers AI + fallback)'; s.style.color = '#bc8cff'; }
+  else { s.textContent = '⚙ Offline + Learned drugs'; s.style.color = ''; }
+}
+
+updateLearnBadge();
+
+</script>
+</body>
+</html>

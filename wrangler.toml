@@ -1,0 +1,17 @@
+name = "med-converter"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "./public"
+
+# Workers AI (free)
+[ai]
+binding = "AI"
+
+# D1 — เก็บเฉพาะยาที่ AI เรียนรู้ใหม่
+[[d1_databases]]
+binding = "DB"
+database_name = "med-learned"
+database_id = "8d9de5b6-0451-4816-bd31-373031a0c215"  # ← ใส่ ID หลัง: wrangler d1 create med-learned
+
+# Optional fallback AI keys
+# wrangler pages secret put GEMINI_API_KEY
+# wrangler pages secret put GROQ_API_KEY

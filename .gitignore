@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler / local artifacts
+.wrangler/
+wrangler-data/
+*.sqlite
+*.db
+*.log
+
+# Env files (keep .env.example)
+.env
+.env.*
+!.env.example
+!.env.example.*
+
+# Builds / coverage / caches
+dist/
+build/
+.next/
+.nuxt/
+out/
+coverage/
+.cache/
+.parcel-cache/
+
+# Editor / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Misc
+*.tgz
+*.zip
